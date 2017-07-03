@@ -74,3 +74,58 @@ void sja1105_cgu_pll_control_show(struct sja1105_cgu_pll_control *pll_control)
 	printf("PD        %" PRIX64 "\n", pll_control->pd);
 }
 
+int sja1105_cgu_rmii_pll_config(struct spi_setup *spi_setup)
+{
+	const int MSG_SIZE = SIZE_SPI_MSG_HEADER + 4;
+	const int PLL1_OFFSET = 0x0A;
+	struct  sja1105_cgu_pll_control pll;
+	struct  sja1105_spi_message msg;
+	uint8_t tx_buf[MSG_SIZE];
+	uint8_t rx_buf[MSG_SIZE];
+	int     rc;
+
+	/* PLL1 must be enabled and output 50 Mhz.
+	 * This is done by writing first 0x0A010941 to
+	 * the PLL_1_C register and then deasserting
+	 * power down (PD) 0x0A010940. */
+
+	memset(tx_buf, 0, MSG_SIZE);
+	memset(rx_buf, 0, MSG_SIZE);
+
+	/* Header */
+	msg.access     = SPI_WRITE;
+	msg.read_count = 0;
+	msg.address    = CGU_ADDR + PLL1_OFFSET;
+	sja1105_spi_message_set(tx_buf, &msg);
+
+	/* Payload */
+	pll.pllclksrc = 0xA;
+	pll.msel      = 0x1;
+	pll.autoblock = 0x1;
+	pll.psel      = 0x1;
+	pll.direct    = 0x0;
+	pll.fbsel     = 0x1;
+	pll.bypass    = 0x0;
+	pll.pd        = 0x1;
+
+	/* Step 1: PLL1 setup for 50Mhz */
+	sja1105_cgu_pll_control_set(tx_buf + 4, &pll);
+	rc = spi_transfer(spi_setup, tx_buf, rx_buf, MSG_SIZE);
+	if (rc < 0) {
+		loge("failed to configure PLL1 for 50MHz");
+		goto out;
+	}
+
+	/* Step 2: Enable PLL1 */
+	pll.pd        = 0x0;
+
+	sja1105_cgu_pll_control_set(tx_buf + 4, &pll);
+	rc = spi_transfer(spi_setup, tx_buf, rx_buf, MSG_SIZE);
+	if (rc < 0) {
+		loge("failed to enable PLL1");
+		goto out;
+	}
+out:
+	return rc;
+}
+

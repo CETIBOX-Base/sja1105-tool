@@ -81,10 +81,19 @@ static int rmii_clocking_setup(struct spi_setup *spi_setup, int port, int rmii_m
 		goto error;
 	}
 	logv("configuring rmii clocking for port %d...", port);
+	if (rmii_mode == XMII_MODE_MAC) {
+		/* Configure and enable PLL1 for 50Mhz output */
+		rc = sja1105_cgu_rmii_pll_config(spi_setup);
+		if (rc < 0) {
+			goto error;
+		}
+	}
+	/* Disable IDIV for this port */
 	rc = sja1105_cgu_idiv_config(spi_setup, port, 0, 1);
 	if (rc < 0) {
 		goto error;
 	}
+	/* Source to sink mappings */
 	rc = sja1105_cgu_rmii_ref_clk_config(spi_setup, port);
 	if (rc < 0) {
 		goto error;
