@@ -182,6 +182,13 @@ int sja1105_cgu_mii_tx_clk_config(
 	uint8_t rx_buf[MSG_SIZE];
 	/* UM10944.pdf, Table 78, CGU Register overview */
 	int     mii_tx_clk_offsets[] = {0x13, 0x1A, 0x21, 0x28, 0x2F};
+	int     clk_sources[] = {
+		CLKSRC_MII0_TX_CLK,
+		CLKSRC_MII1_TX_CLK,
+		CLKSRC_MII2_TX_CLK,
+		CLKSRC_MII3_TX_CLK,
+		CLKSRC_MII4_TX_CLK,
+	};
 
 	memset(tx_buf, 0, MSG_SIZE);
 	memset(rx_buf, 0, MSG_SIZE);
@@ -193,7 +200,7 @@ int sja1105_cgu_mii_tx_clk_config(
 	sja1105_spi_message_set(tx_buf, &msg);
 
 	/* Payload */
-	mii_tx_clk.clksrc    = CLKSRC_PLL1; /* XXX This is surely wrong */
+	mii_tx_clk.clksrc    = clk_sources[port];
 	mii_tx_clk.autoblock = 1;           /* Autoblock clk while changing clksrc */
 	mii_tx_clk.pd        = 0;           /* Power Down off => enabled */
 	sja1105_cgu_mii_control_set(tx_buf + SIZE_SPI_MSG_HEADER, &mii_tx_clk);
@@ -212,6 +219,13 @@ int sja1105_cgu_mii_rx_clk_config(
 	uint8_t rx_buf[MSG_SIZE];
 	/* UM10944.pdf, Table 78, CGU Register overview */
 	int     mii_rx_clk_offsets[] = {0x14, 0x1B, 0x22, 0x29, 0x30};
+	int     clk_sources[] = {
+		CLKSRC_MII0_RX_CLK,
+		CLKSRC_MII1_RX_CLK,
+		CLKSRC_MII2_RX_CLK,
+		CLKSRC_MII3_RX_CLK,
+		CLKSRC_MII4_RX_CLK,
+	};
 
 	memset(tx_buf, 0, MSG_SIZE);
 	memset(rx_buf, 0, MSG_SIZE);
@@ -223,7 +237,7 @@ int sja1105_cgu_mii_rx_clk_config(
 	sja1105_spi_message_set(tx_buf, &msg);
 
 	/* Payload */
-	mii_rx_clk.clksrc    = CLKSRC_PLL1;
+	mii_rx_clk.clksrc    = clk_sources[port];
 	mii_rx_clk.autoblock = 1;           /* Autoblock clk while changing clksrc */
 	mii_rx_clk.pd        = 0;           /* Power Down off => enabled */
 	sja1105_cgu_mii_control_set(tx_buf + SIZE_SPI_MSG_HEADER, &mii_rx_clk);
