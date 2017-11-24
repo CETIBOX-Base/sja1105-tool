@@ -108,10 +108,19 @@ void cleanup(struct spi_setup *spi_setup)
 int main(int argc, char *argv[])
 {
 	struct spi_setup spi_setup;
+	char * conf_file;
 
+	/* Get config file name from environment, use default if env variable is
+	   not set.
+	*/
+	conf_file = getenv("SJA1105_CONF");
+	if (!conf_file) {
+		conf_file = SJA1105_CONF_FILE;
+	}
+	
 	/* discard program name */
 	argc--; argv++;
-	read_config_file(SJA1105_CONF_FILE, &spi_setup, &general_config);
+	read_config_file(conf_file, &spi_setup, &general_config);
 	parse_args(&spi_setup, argc, argv);
 	cleanup(&spi_setup);
 	logv("ok");
