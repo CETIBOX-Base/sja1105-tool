@@ -111,3 +111,17 @@ int spi_transfer(const struct spi_setup *spi_setup, const void *tx, void *rx, in
 		return ioctl(spi_setup->fd, SPI_IOC_MESSAGE(1), &tr);
 	}
 }
+
+/* With the sja1105_spi module, SPI transfers performed by the module may
+   confuse the switch configuration process. This ioctl can be used to
+   deactivate the automated transfers. For other spi modules, it will return
+   an invalid ioctl error which is ignored.
+*/
+#define SJA1105_IOC_POLL _IOW(SPI_IOC_MAGIC, 255, uint8_t)
+
+void spi_sja1105_set_polling(const struct spi_setup *spi_setup, int enable)
+{
+	uint8_t poll = enable?1:0;
+	ioctl(spi_setup->fd, SJA1105_IOC_POLL, &poll);
+}
+
