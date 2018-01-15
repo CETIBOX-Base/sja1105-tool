@@ -139,7 +139,7 @@ int sja1105_clocking_setup(struct spi_setup *spi_setup,
                            struct sja1105_xmii_params_table *params,
                            struct sja1105_mac_config_entry  *mac_config)
 {
-	int speed_mbps;
+	int speed_mbps = 0;
 	int rc;
 	int i;
 
@@ -153,14 +153,19 @@ int sja1105_clocking_setup(struct spi_setup *spi_setup,
 		case 1: speed_mbps = 1000; break;
 		case 2: speed_mbps = 100;  break;
 		case 3: speed_mbps = 10;   break;
-		default: loge("auto speed not yet supported"); return -1;
+		case 0: break;
+		default: loge("invalid speed"); return -1;
 		}
 		if (params->xmii_mode[i] == XMII_SPEED_MII) {
 			mii_clocking_setup(spi_setup, i, params->phy_mac[i]);
 		} else if (params->xmii_mode[i] == XMII_SPEED_RMII) {
 			rmii_clocking_setup(spi_setup, i, params->phy_mac[i]);
 		} else if (params->xmii_mode[i] == XMII_SPEED_RGMII) {
-			rgmii_clocking_setup(spi_setup, i, speed_mbps);
+			if (speed_mbps == 0) {
+				sja1105_rgmii_cfg_pad_tx_config(spi_setup, i);
+			} else {
+				rgmii_clocking_setup(spi_setup, i, speed_mbps);
+			}
 		} else {
 			loge("Invalid xmii_mode for port %d specified: %" PRIu64,
 			     i, params->xmii_mode[i]);
