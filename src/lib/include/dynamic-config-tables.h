@@ -1,5 +1,5 @@
 /******************************************************************************
- * Copyright (c) 2016, NXP Semiconductors
+ * Copyright (c) 2017, NXP Semiconductors
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -28,38 +28,35 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  *****************************************************************************/
-#ifndef _SJA1105_TOOL_COMMON_H
-#define _SJA1105_TOOL_COMMON_H
+#ifndef _DYN_CFG_TABLES_H
+#define _DYN_CFG_TABLES_H
 
-#include <stdint.h>
-#include <stdio.h>
+#define SJA1105_MGMT_ROUTE_COUNT 4
 
-#define MAX_LINE_SIZE 2048
+#include "static-config-tables.h"
 
-/* Macros for conditional, error, verbose and debug logging */
-extern int SJA1105_DEBUG_CONDITION;
-extern int SJA1105_VERBOSE_CONDITION;
+struct sja1105_mgmt_entry {
+	uint64_t ts_regid;
+	uint64_t egr_ts;
+	uint64_t macaddr;
+	uint64_t destports;
+	uint64_t enfport;
+	uint64_t index;
+};
 
-#define _log(file, fmt, ...) do { \
-	if (SJA1105_DEBUG_CONDITION) { \
-		fprintf(file, "%s@%d: " fmt "\n", \
-		__func__, __LINE__, ##__VA_ARGS__); \
-	} else { \
-		fprintf(file, fmt "\n", ##__VA_ARGS__); \
-	} \
-} while(0);
+union sja1105_dyn_l2_lookup_entry {
+	struct sja1105_l2_lookup_entry l2;
+	struct sja1105_mgmt_entry mgmt;
+};
 
-#define logc(file, condition, ...) do { \
-	if (condition) { \
-		_log(file, __VA_ARGS__); \
-	} \
-} while(0);
-
-#define loge(...) _log(stderr, __VA_ARGS__)
-#define logi(...) _log(stdout, __VA_ARGS__)
-#define logv(...) logc(stdout, SJA1105_VERBOSE_CONDITION, __VA_ARGS__);
-
-void formatted_append(char *buffer, char *width_fmt, char *fmt, ...);
-void print_array(char *print_buf, uint64_t *array, int count);
+struct sja1105_dyn_l2_lookup_cmd {
+	uint64_t valid;
+	uint64_t rdwrset;
+	uint64_t errors;
+	uint64_t lockeds;
+	uint64_t valident;
+	uint64_t mgmtroute;
+	union sja1105_dyn_l2_lookup_entry entry;
+};
 
 #endif

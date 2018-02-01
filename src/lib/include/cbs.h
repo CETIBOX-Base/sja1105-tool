@@ -1,5 +1,5 @@
 /******************************************************************************
- * Copyright (c) 2016, NXP Semiconductors
+ * Copyright (c) 2017, NXP Semiconductors
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -28,38 +28,25 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  *****************************************************************************/
-#ifndef _SJA1105_TOOL_COMMON_H
-#define _SJA1105_TOOL_COMMON_H
+#ifndef _CBS_H
+#define _CBS_H
 
-#include <stdint.h>
-#include <stdio.h>
+#include "spi.h"
 
-#define MAX_LINE_SIZE 2048
-
-/* Macros for conditional, error, verbose and debug logging */
-extern int SJA1105_DEBUG_CONDITION;
-extern int SJA1105_VERBOSE_CONDITION;
-
-#define _log(file, fmt, ...) do { \
-	if (SJA1105_DEBUG_CONDITION) { \
-		fprintf(file, "%s@%d: " fmt "\n", \
-		__func__, __LINE__, ##__VA_ARGS__); \
-	} else { \
-		fprintf(file, fmt "\n", ##__VA_ARGS__); \
-	} \
-} while(0);
-
-#define logc(file, condition, ...) do { \
-	if (condition) { \
-		_log(file, __VA_ARGS__); \
-	} \
-} while(0);
-
-#define loge(...) _log(stderr, __VA_ARGS__)
-#define logi(...) _log(stdout, __VA_ARGS__)
-#define logv(...) logc(stdout, SJA1105_VERBOSE_CONDITION, __VA_ARGS__);
-
-void formatted_append(char *buffer, char *width_fmt, char *fmt, ...);
-void print_array(char *print_buf, uint64_t *array, int count);
+struct sja1105_cbs {
+	/* UM10944.pdf Table 62. Credit-based shaping block
+	 * register 1 (address 30h).
+	 * Used as identification */
+	uint64_t index;
+	uint64_t port;
+	uint64_t prio;
+	/* UM10944.pdf Table 63. Credit-based shaping block
+	 * registers 2 to 5 (address 2Fh to 2Ch).
+	 * Used for actual configuration. */
+	uint64_t credit_lo;
+	uint64_t credit_hi;
+	uint64_t send_slope;
+	uint64_t idle_slope;
+};
 
 #endif

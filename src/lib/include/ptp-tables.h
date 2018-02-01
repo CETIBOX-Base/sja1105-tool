@@ -1,5 +1,5 @@
 /******************************************************************************
- * Copyright (c) 2016, NXP Semiconductors
+ * Copyright (c) 2017, NXP Semiconductors
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -28,38 +28,41 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  *****************************************************************************/
-#ifndef _SJA1105_TOOL_COMMON_H
-#define _SJA1105_TOOL_COMMON_H
+#ifndef _PTP_TABLES_H
+#define _PTP_TABLES_H
 
 #include <stdint.h>
-#include <stdio.h>
 
-#define MAX_LINE_SIZE 2048
+#define SJA1105_PTPCLKCORP_ADDR 0x1D
+#define SJA1105_PTPTSCLK_ADDR   0x1B
+#define SJA1105_PTPCLKRATE_ADDR 0x1A
+#define SJA1105_PTPCLKVAL_ADDR  0x18
+#define SJA1105_PTPPINDUR_ADDR  0x16
+#define SJA1105_PTPPINST_ADDR   0x14
+#define SJA1105_PTPSCHTM_ADDR   0x12
 
-/* Macros for conditional, error, verbose and debug logging */
-extern int SJA1105_DEBUG_CONDITION;
-extern int SJA1105_VERBOSE_CONDITION;
+#define SIZE_PTP_CONFIG         (7*8)
+#define PTP_ADDR                0x0   /* Offset into CORE_ADDR */
 
-#define _log(file, fmt, ...) do { \
-	if (SJA1105_DEBUG_CONDITION) { \
-		fprintf(file, "%s@%d: " fmt "\n", \
-		__func__, __LINE__, ##__VA_ARGS__); \
-	} else { \
-		fprintf(file, fmt "\n", ##__VA_ARGS__); \
-	} \
-} while(0);
+enum sja1105_ptp_clk_add_mode {
+	PTP_SET_MODE = 0,
+	PTP_ADD_MODE,
+};
 
-#define logc(file, condition, ...) do { \
-	if (condition) { \
-		_log(file, __VA_ARGS__); \
-	} \
-} while(0);
+enum sja1105_ptpegr_ts_source {
+	TS_PTPTSCLK = 0,
+	TS_PTPCLK = 1
+};
 
-#define loge(...) _log(stderr, __VA_ARGS__)
-#define logi(...) _log(stdout, __VA_ARGS__)
-#define logv(...) logc(stdout, SJA1105_VERBOSE_CONDITION, __VA_ARGS__);
-
-void formatted_append(char *buffer, char *width_fmt, char *fmt, ...);
-void print_array(char *print_buf, uint64_t *array, int count);
+struct sja1105_ptp_cmd {
+	uint64_t ptpstrtsch;   /* start schedule */
+	uint64_t ptpstopsch;   /* stop schedule */
+	uint64_t startptpcp;   /* start pin toggle  */
+	uint64_t stopptpcp;    /* stop pin toggle */
+	uint64_t resptp;       /* reset */
+	uint64_t corrclk4ts;   /* if (1) timestamps are based on ptpclk,
+	                          if (0) timestamps are based on ptptsclk */
+	uint64_t ptpclkadd;    /* enum sja1105_ptp_clk_add_mode */
+};
 
 #endif
