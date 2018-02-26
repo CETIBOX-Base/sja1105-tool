@@ -38,6 +38,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdbool.h>
 /* These are our own libraries */
 #include <lib/include/static-config.h>
 #include <lib/include/gtable.h>
@@ -147,10 +148,41 @@ out:
    deactivate the automated transfers. For other spi modules, it will return
    an invalid ioctl error which is ignored.
 */
-#define SJA1105_IOC_POLL _IOW(SPI_IOC_MAGIC, 255, uint8_t)
+struct sja1105_poll_config {
+	uint32_t mac_config[5];
+	bool poll_enable;
+};
 
-void spi_sja1105_set_polling(const struct sja1105_spi_setup *spi_setup, int enable)
+#define SJA1105_IOC_POLL _IOW(SPI_IOC_MAGIC, 255, struct sja1105_poll_config)
+
+void spi_sja1105_set_polling(const struct sja1105_spi_setup *spi_setup, int enable,
+							 struct sja1105_static_config *config)
 {
-	uint8_t poll = enable?1:0;
-	ioctl(spi_setup->fd, SJA1105_IOC_POLL, &poll);
+	struct sja1105_poll_config poll_config;
+
+	/* Pass the MAC configuration entry to the sja1105 kernel module in
+	   dynamic reconfiguration register format.
+	   This is needed to not clobber the configuration values when writing the
+	   dynamic reconfiguration register to update the PHY speed.
+	*/
+	if (enable) {
+		int i;
+
+		for (i = 0;i < 5;++i) {
+			poll_config.mac_config[i] =
+				((config->mac_config[i].drpdtag==0)?0:(1<<23)) |
+				((config->mac_config[i].drpuntag==0)?0:(1<<22)) |
+				((config->mac_config[i].retag==0)?0:(1<<21)) |
+				((config->mac_config[i].dyn_learn==0)?0:(1<<20)) |
+				((config->mac_config[i].egress==0)?0:(1<<19)) |
+				((config->mac_config[i].ingress==0)?0:(1<<18)) |
+				((config->mac_config[i].ing_mirr==0)?0:(1<<17)) |
+				((config->mac_config[i].egr_mirr==0)?0:(1<<16)) |
+				((config->mac_config[i].vlanprio&0x7)<<12) |
+				(config->mac_config[i].vlanid&0xfff);
+		}
+	}
+	poll_config.poll_enable = enable;
+
+	ioctl(spi_setup->fd, SJA1105_IOC_POLL, &poll_config);
 }

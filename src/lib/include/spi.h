@@ -78,7 +78,9 @@ int sja1105_spi_send_int(struct sja1105_spi_setup *spi_setup,
                          uint64_t *value,
                          uint64_t size_bytes);
 
-void spi_sja1105_set_polling(const struct sja1105_spi_setup *spi_setup, int enable);
+struct sja1105_static_config;
+void spi_sja1105_set_polling(const struct sja1105_spi_setup *spi_setup, int enable,
+							 struct sja1105_static_config *config);
 
 #define SIZE_SJA1105_DEVICE_ID 4
 #define SIZE_SPI_MSG_HEADER    4

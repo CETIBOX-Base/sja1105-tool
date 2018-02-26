@@ -304,7 +304,7 @@ int static_config_flush(struct sja1105_spi_setup *spi_setup,
 
 	if (spi_setup->dry_run == 0) {
 		/* Disable kernel polling while reconfiguring */
-		spi_sja1105_set_polling(spi_setup, 0);
+		spi_sja1105_set_polling(spi_setup, 0, NULL);
 
 		/* These checks simply cannot pass (and do not even
 		 * make sense to have) if we are in dry run mode */
@@ -362,7 +362,7 @@ int static_config_flush(struct sja1105_spi_setup *spi_setup,
 out:
 	if (spi_setup->dry_run == 0) {
 		/* Always reenable polling on exit */
-		spi_sja1105_set_polling(spi_setup, 1);
+		spi_sja1105_set_polling(spi_setup, 1, config);
 	}
 	return rc;
 }
