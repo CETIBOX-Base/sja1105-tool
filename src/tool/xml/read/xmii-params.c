@@ -30,27 +30,27 @@
  *****************************************************************************/
 #include "internal.h"
 
-static int entry_get(xmlNode *node, struct sja1105_xmii_params_table *entry)
+static int entry_get(xmlNode *node, struct sja1105_xmii_params_entry *entry)
 {
 	int rc = 0;
 	rc  = xml_read_array(&entry->phy_mac, 5, "phy_mac", node);
 	rc += xml_read_array(&entry->xmii_mode, 5, "xmii_mode", node);
 	if (rc != 5 + 5) {
 		loge("Must have exactly 5 PHY_MAC and 5 XMII_MODE entries!");
-		rc = -1;
+		rc = -ERANGE;
 	}
 	return rc;
 }
 
 static int parse_entry(xmlNode *node, struct sja1105_static_config *config)
 {
-	struct sja1105_xmii_params_table entry;
+	struct sja1105_xmii_params_entry entry;
 	int rc;
 
 	if (config->xmii_params_count >= MAX_XMII_PARAMS_COUNT) {
 		loge("Cannot have more than %d xMII Mode Parameters "
 		     "Table entries!", MAX_XMII_PARAMS_COUNT);
-		rc = -1;
+		rc = -ERANGE;
 		goto out;
 	}
 	memset(&entry, 0, sizeof(entry));
@@ -68,7 +68,7 @@ int xmii_mode_parameters_table_parse(xmlNode *node,
 
 	if (node->type != XML_ELEMENT_NODE) {
 		loge("xMII Mode Parameters Table node must be of element type!");
-		rc = -1;
+		rc = -EINVAL;
 		goto out;
 	}
 	for (c = node->children; c != NULL; c = c->next) {

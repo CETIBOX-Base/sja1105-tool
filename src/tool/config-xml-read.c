@@ -29,9 +29,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  *****************************************************************************/
 #include "xml/read/external.h"
-#include <errno.h>
 #include <lib/include/staging-area.h>
 #include <common.h>
+#include <inttypes.h>
 #include "internal.h"
 
 #ifndef LIBXML_TREE_ENABLED
@@ -62,7 +62,7 @@ int xml_read_field(void *where, char *field_name, xmlNode *node)
 	}
 	if (value == NULL) {
 		loge("no element named \"%s\"!", field_name);
-		rc = -1;
+		rc = -EINVAL;
 		goto out;
 	}
 	rc = reliable_uint64_from_string(field_val, value, NULL);
@@ -88,12 +88,28 @@ int xml_read_array(void *where, int max_count, char *field_name, xmlNode *node)
 	}
 	if (value == NULL) {
 		loge("no element named \"%s\"!", field_name);
-		rc = -1;
+		rc = -EINVAL;
 		goto out;
 	}
 	rc = read_array(value, field_val, max_count);
 out:
 	xmlFree(value);
+	return rc;
+}
+
+int device_id_parse(xmlNode *node, uint64_t *device_id)
+{
+	int rc = 0;
+
+	rc = xml_read_field(device_id, "device-id", node);
+	if (rc < 0) {
+		loge("No device-id entry present in static config node!");
+		goto out;
+	}
+	logv("read device-id 0x%" PRIx64 " (%s)",
+	     *device_id, sja1105_device_id_string_get(
+	     *device_id, SJA1105_PART_NR_DONT_CARE));
+out:
 	return rc;
 }
 
@@ -123,6 +139,7 @@ parse_config_table(xmlNode *node, struct sja1105_static_config *config)
 		"general-parameters-table",
 		"retagging-table",
 		"xmii-mode-parameters-table",
+		"sgmii-table",
 	};
 	int (*next_parse_config_table[])(xmlNode *, struct
 	                                 sja1105_static_config *) = {
@@ -146,6 +163,7 @@ parse_config_table(xmlNode *node, struct sja1105_static_config *config)
 		general_parameters_table_parse,
 		retagging_table_parse,
 		xmii_mode_parameters_table_parse,
+		sgmii_table_parse,
 	};
 	int rc;
 	table_name = (char*) node->name;
@@ -183,16 +201,18 @@ parse_root(xmlNode *root, struct sja1105_staging_area *staging_area)
 {
 	char *config_section;
 	xmlNode *node;
+	int static_config_parsed = 0;
+	int device_id_parsed = 0;
 	int rc = 0;
 
 	if (root->type != XML_ELEMENT_NODE) {
 		loge("Root node must be of element type!");
-		rc = -1;
+		rc = -EINVAL;
 		goto out;
 	}
 	if (strcasecmp((char*) root->name, SJA1105_NETCONF_ROOT)) {
 		loge("Root node must be named \"%s\"!", SJA1105_NETCONF_ROOT);
-		rc = -1;
+		rc = -EINVAL;
 		goto out;
 	}
 	for (node = root->children; node != NULL; node = node->next) {
@@ -203,14 +223,33 @@ parse_root(xmlNode *root, struct sja1105_staging_area *staging_area)
 		if (strcmp(config_section, "static") == 0) {
 			rc = parse_static_config(node,
 			                        &staging_area->static_config);
+			if (rc < 0) {
+				loge("Could not parse static config from XML!");
+				goto out;
+			}
+			static_config_parsed = 1;
+		} else if (strcmp(config_section, "device-id") == 0) {
+			rc = device_id_parse(root, &staging_area->
+			                     static_config.device_id);
+			if (rc < 0) {
+				loge("Could not get device-id from XML!");
+				goto out;
+			}
+			device_id_parsed = 1;
 		} else {
 			loge("unknown config section %s", config_section);
 			rc = -EINVAL;
 		}
-		if (rc < 0) {
-			loge("Could not parse XML file!");
-			goto out;
-		}
+	}
+	if (!static_config_parsed) {
+		loge("<static> node not present in XML!");
+		rc = -EINVAL;
+		goto out;
+	}
+	if (!device_id_parsed) {
+		loge("<device-id> not present in XML!");
+		rc = -EINVAL;
+		goto out;
 	}
 out:
 	return rc;

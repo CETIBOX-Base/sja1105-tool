@@ -1,5 +1,5 @@
 /******************************************************************************
- * Copyright (c) 2017, NXP Semiconductors
+ * Copyright (c) 2018, NXP Semiconductors
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,11 +31,29 @@
 #include <string.h>
 #include <inttypes.h>
 /* These are our own include files */
-#include <lib/include/cbs.h>
 #include <lib/include/gtable.h>
-#include <lib/include/status-tables.h>
+#include <lib/include/port-control.h>
+#include <lib/include/status.h>
 #include <lib/include/spi.h>
 #include <common.h>
+
+int sja1105_inhibit_tx(struct sja1105_spi_setup *spi_setup,
+                       struct sja1105_egress_port_mask *port_mask)
+{
+	const int ETH_PORT_CONTROL_ADDR = 0x11;
+	const int BUF_LEN = 4;
+	uint8_t packed_buf[BUF_LEN];
+	int i;
+
+	for (i = 0; i < SJA1105T_NUM_PORTS; i++) {
+		gtable_pack(packed_buf, &port_mask->inhibit_tx[i], i, i, 4);
+	}
+	return sja1105_spi_send_packed_buf(spi_setup,
+	                                   SPI_WRITE,
+	                                   CORE_ADDR + ETH_PORT_CONTROL_ADDR,
+	                                   packed_buf,
+	                                   4);
+}
 
 /* This function just packs/unpacks the structure for writing to
  * UM10944.pdf Table 62 (address 30h), which commits a change of

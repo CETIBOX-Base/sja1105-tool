@@ -30,17 +30,17 @@
  *****************************************************************************/
 #include "internal.h"
 
-static int entry_get(xmlNode *node, struct sja1105_vl_forwarding_params_table *table)
+static int entry_get(xmlNode *node, struct sja1105_vl_forwarding_params_entry *entry)
 {
 	int rc = 0;
-	rc = xml_read_array(&table->partspc, 8, "partspc", node);
+	rc = xml_read_array(&entry->partspc, 8, "partspc", node);
 	if (rc != 8) {
 		loge("Must have exactly 8 PARTSPC entries!");
-		rc = -1;
+		rc = -ERANGE;
 		goto out;
 	}
-	rc = xml_read_field(&table->debugen, "debugen", node);
-	if (rc) {
+	rc = xml_read_field(&entry->debugen, "debugen", node);
+	if (rc < 0) {
 		loge("VL Forwarding Params Table: failed to read DEBUGEN field!");
 	}
 out:
@@ -49,18 +49,18 @@ out:
 
 static int parse_entry(xmlNode *node, struct sja1105_static_config *config)
 {
-	struct sja1105_vl_forwarding_params_table table;
+	struct sja1105_vl_forwarding_params_entry entry;
 	int rc;
 
 	if (config->vl_forwarding_params_count >= MAX_VL_FORWARDING_PARAMS_COUNT) {
 		loge("Cannot have more than %d VL Forwarding Params entries!",
 		     MAX_VL_FORWARDING_PARAMS_COUNT);
-		rc = -1;
+		rc = -EINVAL;
 		goto out;
 	}
-	memset(&table, 0, sizeof(table));
-	rc = entry_get(node, &table);
-	config->vl_forwarding_params_table[config->vl_forwarding_params_count++] = table;
+	memset(&entry, 0, sizeof(entry));
+	rc = entry_get(node, &entry);
+	config->vl_forwarding_params[config->vl_forwarding_params_count++] = entry;
 out:
 	return rc;
 }
@@ -72,7 +72,7 @@ int vl_fw_params_table_parse(xmlNode *node, struct sja1105_static_config *config
 
 	if (node->type != XML_ELEMENT_NODE) {
 		loge("VL Forwarding Params table node must be of element type!");
-		rc = -1;
+		rc = -EINVAL;
 		goto out;
 	}
 	for (c = node->children; c != NULL; c = c->next) {

@@ -47,6 +47,7 @@ void print_usage()
 	       "   * config\n"
 	       "   * status\n"
 	       "   * reset\n"
+	       "   * reg\n"
 	       "   * help | -h | --help\n"
 	       "   * version | -V | --version\n");
 	printf("\n");
@@ -59,7 +60,10 @@ void print_version()
 	char buf[256];
 	sja1105_lib_get_version(buf);
 	printf("libsja1105 version: %s\n", buf);
+	sja1105_lib_get_build_date(buf);
+	printf("libsja1105 build date: %s\n", buf);
 	printf("sja1105-tool version: %s\n", VERSION);
+	printf("sja1105-tool build date: %s\n", __DATE__ " " __TIME__);
 }
 
 static int parse_special_args(int *argc, char ***argv,
@@ -80,7 +84,7 @@ static int parse_special_args(int *argc, char ***argv,
 			more_special_args = 1;
 			(*argc)--; (*argv)++;
 			/* Do not continue to run */
-			rc = -1;
+			sja1105_err_remap(rc, SJA1105_ERR_USAGE);
 		} else if (matches(arg, "-h") == 0 ||
 		           matches(arg, "help") == 0 ||
 		           matches(arg, "--help") == 0) {
@@ -89,7 +93,7 @@ static int parse_special_args(int *argc, char ***argv,
 			more_special_args = 1;
 			(*argc)--; (*argv)++;
 			/* Do not continue to run */
-			rc = -1;
+			sja1105_err_remap(rc, SJA1105_ERR_USAGE);
 		} else if (matches(arg, "-c") == 0 ||
 		           matches(arg, "--config-file") == 0) {
 			/* Parse non-default config file */
@@ -99,7 +103,7 @@ static int parse_special_args(int *argc, char ***argv,
 			(*argc)--; (*argv)++;
 			(*argc)--; (*argv)++;
 			/* Continue to run */
-			rc = 0;
+			sja1105_err_remap(rc, SJA1105_ERR_OK);
 		}
 	} while (more_special_args && (*argc));
 
@@ -112,16 +116,18 @@ static int parse_args(struct sja1105_spi_setup *spi_setup, int argc, char **argv
 		"configure",
 		"status",
 		"reset",
+		"reg",
 	};
 	int (*next_parse_args[])(struct sja1105_spi_setup*, int, char**) = {
 		config_parse_args,
 		status_parse_args,
 		rgu_parse_args,
+		reg_parse_args,
 	};
 	int  rc;
 
 	if (argc < 1) {
-		rc = -1;
+		rc = -EINVAL;
 		goto error;
 	}
 	rc = get_match(argv[0], options, ARRAY_SIZE(options));
@@ -152,11 +158,16 @@ void cleanup(struct sja1105_spi_setup *spi_setup)
 	}
 }
 
+static int reinterpreted_return_code(int rc)
+{
+	return -rc;
+}
+
 int main(int argc, char *argv[])
 {
 	char *sja1105_conf_file = (char*) default_sja1105_conf_file;
 	struct sja1105_spi_setup spi_setup;
-	int rc = 0;
+	int rc = SJA1105_ERR_OK;
 
 	/* Get config file name from environment, use default if env variable is
 	   not set.
@@ -180,10 +191,10 @@ int main(int argc, char *argv[])
 	/* Adjust gtable for SJA1105 SPI memory layout */
 	gtable_configure(QUIRK_LSW32_IS_FIRST);
 	rc = parse_args(&spi_setup, argc, argv);
-	if (rc == 0) {
+	if (rc == SJA1105_ERR_OK) {
 		logv("ok");
 	}
 	cleanup(&spi_setup);
 out:
-	return rc;
+	return reinterpreted_return_code(rc);
 }

@@ -39,7 +39,7 @@ static int entry_get(xmlNode *node, struct sja1105_mac_config_entry *entry)
 	rc += xml_read_array(&entry->enabled, 8, "enabled", node);
 	if (rc != 8 * 3) {
 		loge("Must have exactly 8 entries for TOP, BASE and ENABLED!");
-		rc = -1;
+		rc = -ERANGE;
 		goto out;
 	}
 	rc  = xml_read_field(&entry->ifg, "ifg", node);
@@ -53,14 +53,22 @@ static int entry_get(xmlNode *node, struct sja1105_mac_config_entry *entry)
 	rc |= xml_read_field(&entry->egr_mirr, "egr_mirr", node);
 	rc |= xml_read_field(&entry->drpnona664, "drpnona664", node);
 	rc |= xml_read_field(&entry->drpdtag, "drpdtag", node);
+	rc |= xml_read_field(&entry->drpsotag, "drpsotag", node);
+	rc |= xml_read_field(&entry->drpsitag, "drpsitag", node);
 	rc |= xml_read_field(&entry->drpuntag, "drpuntag", node);
 	rc |= xml_read_field(&entry->retag, "retag", node);
 	rc |= xml_read_field(&entry->dyn_learn, "dyn_learn", node);
 	rc |= xml_read_field(&entry->egress, "egress", node);
 	rc |= xml_read_field(&entry->ingress, "ingress", node);
+	rc |= xml_read_field(&entry->mirrcie, "mirrcie", node);
+	rc |= xml_read_field(&entry->mirrcetag, "mirrcetag", node);
+	rc |= xml_read_field(&entry->ingmirrvid, "ingmirrvid", node);
+	rc |= xml_read_field(&entry->ingmirrpcp, "ingmirrpcp", node);
+	rc |= xml_read_field(&entry->ingmirrdei, "ingmirrdei", node);
 out:
-	if (rc) {
+	if (rc < 0) {
 		loge("MAC Configuration entry is incomplete!");
+		return -EINVAL;
 	}
 	return rc;
 }
@@ -73,7 +81,7 @@ static int parse_entry(xmlNode *node, struct sja1105_static_config *config)
 	if (config->mac_config_count >= MAX_MAC_CONFIG_COUNT) {
 		loge("Cannot have more than %d MAC Configuration "
 		     "Table entries!", MAX_MAC_CONFIG_COUNT);
-		rc = -1;
+		rc = -ERANGE;
 		goto out;
 	}
 	memset(&entry, 0, sizeof(entry));
@@ -90,7 +98,7 @@ int mac_configuration_table_parse(xmlNode *node, struct sja1105_static_config *c
 
 	if (node->type != XML_ELEMENT_NODE) {
 		loge("MAC Configuration Table node must be of element type!");
-		rc = -1;
+		rc = -EINVAL;
 		goto out;
 	}
 	for (c = node->children; c != NULL; c = c->next) {

@@ -56,6 +56,9 @@ int xml_write_field(xmlTextWriterPtr writer, char *field, uint64_t value)
 	else
 		snprintf(print_buf, MAX_LINE_SIZE, "0x%" PRIX64, value);
 
+	/* Returns the bytes written (may be 0 because of buffering) or -1 in case of error.
+	 * Had to read the libxml2 code for that.
+	 */
 	return xmlTextWriterWriteElement(writer, BAD_CAST field, BAD_CAST print_buf);
 }
 
@@ -65,6 +68,12 @@ int xml_write_array(xmlTextWriterPtr writer, char *field, uint64_t *values, int 
 
 	print_array(print_buf, values, count);
 	return xmlTextWriterWriteElement(writer, BAD_CAST field, BAD_CAST print_buf);
+}
+
+static int device_id_write(xmlTextWriterPtr writer, uint64_t device_id)
+{
+	logv("writing device_id");
+	return xml_write_field(writer, "device-id", device_id);
 }
 
 static int
@@ -92,6 +101,7 @@ static_config_write(xmlTextWriterPtr writer,
 		"general-parameters-table",
 		"retagging-table",
 		"xmii-mode-parameters-table",
+		"sgmii-table",
 	};
 	int (*next_write_config_table[])(xmlTextWriterPtr,
 	                                 struct sja1105_static_config *) = {
@@ -115,28 +125,7 @@ static_config_write(xmlTextWriterPtr writer,
 		general_parameters_table_write,
 		retagging_table_write,
 		xmii_mode_parameters_table_write,
-	};
-	uint64_t entry_counts[] = {
-		config->schedule_count,
-		config->schedule_entry_points_count,
-		config->vl_lookup_count,
-		config->vl_policing_count,
-		config->vl_forwarding_count,
-		config->l2_lookup_count,
-		config->l2_policing_count,
-		config->vlan_lookup_count,
-		config->l2_forwarding_count,
-		config->mac_config_count,
-		config->schedule_params_count,
-		config->schedule_entry_points_params_count,
-		config->vl_forwarding_params_count,
-		config->l2_lookup_params_count,
-		config->l2_forwarding_params_count,
-		config->clk_sync_params_count,
-		config->avb_params_count,
-		config->general_params_count,
-		config->retagging_count,
-		config->xmii_params_count,
+		sgmii_table_write,
 	};
 	int rc = 0;
 	unsigned int i;
@@ -147,13 +136,11 @@ static_config_write(xmlTextWriterPtr writer,
 		goto out;
 	}
 	for (i = 0; i < ARRAY_SIZE(options); i++) {
-		if (entry_counts[i]) {
-			rc |= xmlTextWriterStartElement(writer, BAD_CAST options[i]);
-			rc |= next_write_config_table[i](writer, config);
-			rc |= xmlTextWriterEndElement(writer);
-			if (rc < 0) {
-				goto out;
-			}
+		rc |= xmlTextWriterStartElement(writer, BAD_CAST options[i]);
+		rc |= next_write_config_table[i](writer, config);
+		rc |= xmlTextWriterEndElement(writer);
+		if (rc < 0) {
+			return -EINVAL;
 		}
 	}
 	rc = xmlTextWriterEndElement(writer);
@@ -182,7 +169,7 @@ sja1105_staging_area_to_xml(char *xml_file,
 	writer = xmlNewTextWriterFilename(xml_file, 0);
 	if (writer == NULL) {
 		loge("cannot create xml writer");
-		rc = -1;
+		rc = -errno;
 		goto out;
 	}
 	rc |= xmlTextWriterSetIndent(writer, 1);
@@ -202,6 +189,8 @@ sja1105_staging_area_to_xml(char *xml_file,
 	}
 	rc = xmlTextWriterWriteAttribute(writer, BAD_CAST "xmlns",
 	                                 BAD_CAST SJA1105_NETCONF_NS);
+	/* Device ID */
+	device_id_write(writer, staging_area->static_config.device_id);
 	/* Static config */
 	rc = static_config_write(writer, &staging_area->static_config);
 	if (rc < 0) {
@@ -223,7 +212,7 @@ sja1105_staging_area_to_xml(char *xml_file,
 	 */
 	xmlCleanupParser();
 out:
-	return rc;
+	return 0;
 }
 
 #endif

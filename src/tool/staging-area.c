@@ -36,11 +36,11 @@
 #include <stdio.h>
 #include <string.h>
 #include <inttypes.h>
-#include <errno.h>
 #include "internal.h"
 /* From libsja1105 */
 #include <lib/include/static-config.h>
 #include <lib/include/staging-area.h>
+#include <lib/include/port-control.h>
 #include <lib/include/gtable.h>
 #include <lib/include/spi.h>
 #include <lib/include/status.h>
@@ -95,36 +95,40 @@ staging_area_hexdump(const char *staging_area_file)
 	if (fd < 0) {
 		loge("Staging area %s does not exist!", staging_area_file);
 		rc = fd;
-		goto out_1;
+		goto filesystem_error1;
 	}
 	rc = fstat(fd, &stat);
 	if (rc < 0) {
 		loge("could not read file size");
-		goto out_2;
+		goto filesystem_error2;
 	}
 	len = stat.st_size;
 	buf = (char*) malloc(len * sizeof(char));
 	if (!buf) {
 		loge("malloc failed");
-		goto out_2;
+		goto filesystem_error2;
 	}
 	rc = reliable_read(fd, buf, len);
 	if (rc < 0) {
-		goto out_3;
+		goto filesystem_error3;
 	}
 	printf("Static configuration:\n");
 	/* Returns number of bytes dumped */
 	rc = sja1105_static_config_hexdump(buf);
 	if (rc < 0) {
 		loge("error while interpreting config");
-		goto out_3;
+		goto invalid_staging_area_error;
 	}
 	logi("static config: dumped %d bytes", rc);
-out_3:
+filesystem_error3:
 	free(buf);
-out_2:
+filesystem_error2:
 	close(fd);
-out_1:
+filesystem_error1:
+	sja1105_err_remap(rc, SJA1105_ERR_FILESYSTEM);
+	return rc;
+invalid_staging_area_error:
+	sja1105_err_remap(rc, SJA1105_ERR_STAGING_AREA_INVALID);
 	return rc;
 }
 
@@ -145,35 +149,41 @@ staging_area_load(const char *staging_area_file,
 	if (fd < 0) {
 		loge("Staging area %s does not exist!", staging_area_file);
 		rc = fd;
-		goto out_1;
+		goto filesystem_error1;
 	}
 	rc = fstat(fd, &stat);
 	if (rc < 0) {
 		loge("could not read file size");
-		goto out_2;
+		goto filesystem_error2;
 	}
 	staging_area_len = stat.st_size;
 	buf = (char*) malloc(staging_area_len * sizeof(char));
 	if (!buf) {
 		loge("malloc failed");
-		goto out_2;
+		goto filesystem_error2;
 	}
 	rc = reliable_read(fd, buf, staging_area_len);
 	if (rc < 0) {
-		goto out_3;
+		loge("failed to read staging area from file %s",
+		     staging_area_file);
+		goto filesystem_error3;
 	}
 	/* Static config */
 	rc = sja1105_static_config_unpack(buf, static_config);
 	if (rc < 0) {
 		loge("error while interpreting config");
-		goto out_3;
+		goto invalid_staging_area_error;
 	}
-	rc = 0;
-out_3:
+	return 0;
+filesystem_error3:
 	free(buf);
-out_2:
+filesystem_error2:
 	close(fd);
-out_1:
+filesystem_error1:
+	sja1105_err_remap(rc, SJA1105_ERR_FILESYSTEM);
+	return rc;
+invalid_staging_area_error:
+	sja1105_err_remap(rc, SJA1105_ERR_STAGING_AREA_INVALID);
 	return rc;
 }
 
@@ -198,7 +208,11 @@ staging_area_save(const char *staging_area_file,
 		goto out_1;
 	}
 	logv("saving static config... %d bytes", static_config_len);
-	sja1105_static_config_pack(buf, static_config);
+	rc = sja1105_static_config_pack(buf, static_config);
+	if (rc < 0) {
+		loge("sja1105_static_config_pack failed");
+		goto out_2;
+	}
 
 	logv("total staging area size: %d bytes", staging_area_len);
 	fd = open(staging_area_file, O_WRONLY | O_CREAT | O_TRUNC, 0644);
@@ -227,35 +241,24 @@ static_config_upload(struct sja1105_spi_setup *spi_setup,
 {
 	struct   sja1105_table_header final_header;
 	char    *final_header_ptr;
-	/* XXX: Maybe 100 is not the best number of chunks here */
-	struct sja1105_spi_chunk chunks[100];
-	int    chunk_count;
-	char   tx_buf[SIZE_SPI_MSG_HEADER + SIZE_SPI_MSG_MAXLEN];
-	char   rx_buf[SIZE_SPI_MSG_MAXLEN + SIZE_SPI_MSG_HEADER];
 	char  *config_buf;
 	int    config_buf_len;
 	int    crc_len;
 	int    rc;
-	int    i;
 
-	config_buf_len = sja1105_static_config_get_length(config) +
-	                 SIZE_SJA1105_DEVICE_ID;
+	config_buf_len = sja1105_static_config_get_length(config);
 	config_buf = (char*) malloc(config_buf_len * sizeof(char));
 	if (!config_buf) {
 		loge("malloc failed");
 		rc = -errno;
 		goto out;
 	}
-	/* Write Device ID to first 4 bytes of config_buf */
-	rc = gtable_pack(config_buf, &spi_setup->device_id, 31, 0,
-	                 SIZE_SJA1105_DEVICE_ID);
+	/* Write Device ID and config tables to config_buf */
+	rc = sja1105_static_config_pack(config_buf, config);
 	if (rc < 0) {
-		loge("failed to write device id to buffer");
+		loge("sja1105_static_config_pack failed");
 		goto out_free;
 	}
-	/* Write config tables to config_buf */
-	sja1105_static_config_pack(config_buf + SIZE_SJA1105_DEVICE_ID,
-	                           config);
 	/* Recalculate CRC of the last header */
 	/* Don't include the CRC field itself */
 	crc_len = config_buf_len - 4;
@@ -267,21 +270,11 @@ static_config_upload(struct sja1105_spi_setup *spi_setup,
 	/* Rewrite */
 	sja1105_table_header_pack(final_header_ptr, &final_header);
 
-	/* Fill chunks array with chunk_count pointers */
-	spi_get_chunks(config_buf, config_buf_len, chunks, &chunk_count);
-
-	for (i = 0; i < chunk_count; i++) {
-		/* Combine chunks[i].msg and chunks[i].buf into tx_buf */
-		spi_message_aggregate(tx_buf, &chunks[i].msg, chunks[i].buf,
-		                      chunks[i].size);
-		/* Send it out */
-		rc = sja1105_spi_transfer(spi_setup, tx_buf, rx_buf,
-		                          SIZE_SPI_MSG_HEADER + chunks[i].size);
-		if (rc < 0) {
-			loge("sja1105_spi_transfer failed");
-			goto out_free;
-		}
-	}
+	rc = sja1105_spi_send_long_packed_buf(spi_setup,
+	                                      SPI_WRITE,
+	                                      CONFIG_ADDR,
+	                                      config_buf,
+	                                      config_buf_len);
 out_free:
 	free(config_buf);
 out:
@@ -291,49 +284,52 @@ out:
 int static_config_flush(struct sja1105_spi_setup *spi_setup,
                         struct sja1105_static_config *config)
 {
-	struct sja1105_reset_ctrl     reset = {.rst_ctrl = RGU_COLD};
 	struct sja1105_general_status status;
-	uint64_t expected_device_id = spi_setup->device_id;
-	int rc;
+	struct sja1105_egress_port_mask port_mask;
+	int i, rc;
 
-	/* Check that we are talking with the right device over SPI */
-	rc = sja1105_general_status_get(spi_setup, &status);
+	rc = sja1105_static_config_check_valid(config);
 	if (rc < 0) {
-		goto out;
+		loge("cannot upload config, because it is not valid");
+		goto staging_area_invalid_error;
 	}
 
 	if (spi_setup->dry_run == 0) {
 		/* Disable kernel polling while reconfiguring */
 		spi_sja1105_set_polling(spi_setup, 0, NULL);
-
-		/* These checks simply cannot pass (and do not even
-		 * make sense to have) if we are in dry run mode */
-		if (status.device_id != expected_device_id) {
-			loge("read device id %" PRIx64 ", expected %" PRIx64,
-			     status.device_id, expected_device_id);
-			goto out;
-		}
 	}
-	rc = sja1105_static_config_check_valid(config);
+	/* Workaround for PHY jabbering during switch reset */
+	memset(&port_mask, 0, sizeof(port_mask));
+	for (i = 0; i < SJA1105T_NUM_PORTS; i++) {
+		port_mask.inhibit_tx[i] = 1;
+	}
+	rc = sja1105_inhibit_tx(spi_setup, &port_mask);
 	if (rc < 0) {
-		loge("cannot upload config, because it is not valid");
-		goto out;
+		loge("sja1105_set_egress_port_mask failed");
+		goto hardware_not_responding_error;
 	}
-	rc = sja1105_reset(spi_setup, &reset);
+	/* Wait for an eventual egress packet to finish transmission
+	 * (reach IFG). It is guaranteed that a second one will not
+	 * follow, and that switch cold reset is thus safe
+	 */
+	usleep(1000);
+	/* Put the SJA1105 in programming mode */
+	rc = sja1105_cold_reset(spi_setup);
 	if (rc < 0) {
 		loge("sja1105_reset failed");
-		goto out;
+		goto hardware_left_floating_error;
 	}
 	rc = static_config_upload(spi_setup, config);
 	if (rc < 0) {
 		loge("static_config_upload failed");
-		goto out;
+		goto hardware_left_floating_error;
 	}
+	/* Configure the CGU (PHY link modes and speeds) */
 	rc = sja1105_clocking_setup(spi_setup, &config->xmii_params[0],
 	                           &config->mac_config[0]);
 	if (rc < 0) {
 		loge("sja1105_clocking_setup failed");
-		goto out;
+		goto hardware_left_floating_error;
 	}
 	/* Check that SJA1105 responded well to the config upload */
 	if (spi_setup->dry_run == 0) {
@@ -341,29 +337,51 @@ int static_config_flush(struct sja1105_spi_setup *spi_setup,
 		 * make sense to have) if we are in dry run mode */
 		rc = sja1105_general_status_get(spi_setup, &status);
 		if (rc < 0) {
-			goto out;
+			goto hardware_left_floating_error;
 		}
 		if (status.ids == 1) {
-			loge("not responding to configured device id");
-			goto out;
+			loge("Mismatch between hardware and staging area "
+			     "device id. Wrote 0x%" PRIx64 ", wants 0x%" PRIx64,
+			     config->device_id, spi_setup->device_id);
+			goto hardware_left_floating_error;
 		}
 		if (status.crcchkl == 1) {
 			loge("local crc failed while uploading config");
-			goto out;
+			goto hardware_left_floating_error;
 		}
 		if (status.crcchkg == 1) {
 			loge("global crc failed while uploading config");
-			goto out;
+			goto hardware_left_floating_error;
 		}
 		if (status.configs == 0) {
 			loge("configuration is invalid");
+			goto hardware_left_floating_error;
 		}
 	}
+
+	if (spi_setup->dry_run == 0) {
+		/* Always reenable polling on exit */
+		spi_sja1105_set_polling(spi_setup, 1, config);
+	}
+
+	rc = SJA1105_ERR_OK;
+	goto out;
+staging_area_invalid_error:
+	sja1105_err_remap(rc, SJA1105_ERR_STAGING_AREA_INVALID);
+	return rc;
+hardware_left_floating_error:
+	sja1105_err_remap(rc, SJA1105_ERR_UPLOAD_FAILED_HW_LEFT_FLOATING);
+	goto out;
+hardware_not_responding_error:
+	sja1105_err_remap(rc, SJA1105_ERR_HW_NOT_RESPONDING);
+	goto out;
+
 out:
 	if (spi_setup->dry_run == 0) {
 		/* Always reenable polling on exit */
 		spi_sja1105_set_polling(spi_setup, 1, config);
 	}
+
 	return rc;
 }
 
@@ -378,6 +396,8 @@ staging_area_flush(struct sja1105_spi_setup *spi_setup,
 		loge("static_config_flush failed");
 		goto out;
 	}
+	/* TODO: other configuration tables?
+	 */
 out:
 	return rc;
 }

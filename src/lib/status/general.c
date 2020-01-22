@@ -35,18 +35,25 @@
 #include <inttypes.h>
 #include <unistd.h>
 /* These are our include files */
-#include <lib/include/status-tables.h>
+#include <lib/include/static-config.h>
+#include <lib/include/status.h>
 #include <lib/include/gtable.h>
 #include <lib/include/spi.h>
 #include <common.h>
 
-static void sja1105_general_status_unpack(void *buf, struct
-                                          sja1105_general_status *status)
+static void
+sja1105_general_status_unpack(void *buf, struct sja1105_general_status *status,
+                              uint64_t device_id)
 {
 	/* So that addition translates to 4 bytes */
 	uint32_t *p = (uint32_t*) buf;
 	memset(status, 0, sizeof(*status));
-	gtable_unpack(p + 0x0, &status->device_id, 31,  0, 4);
+	/* device_id is missing from the buffer, but we don't
+	 * want to diverge from the manual definition of the
+	 * register addresses, so we'll back off one step with
+	 * the register pointer, and never access p[0].
+	 */
+	p--;
 	gtable_unpack(p + 0x1, &status->configs,   31, 31, 4);
 	gtable_unpack(p + 0x1, &status->crcchkl,   30, 30, 4);
 	gtable_unpack(p + 0x1, &status->ids,       29, 29, 4);
@@ -78,16 +85,25 @@ static void sja1105_general_status_unpack(void *buf, struct
 	gtable_unpack(p + 0x8, &status->vlnotfound, 0,  0, 4);
 	gtable_unpack(p + 0x9, &status->emptys,    31, 31, 4);
 	gtable_unpack(p + 0x9, &status->buffers,   30,  0, 4);
-	gtable_unpack(p + 0xA, &status->port_0ah,  15,  8, 4);
-	gtable_unpack(p + 0xA, &status->fwds_0ah,   1,  1, 4);
-	gtable_unpack(p + 0xA, &status->parts,      0,  0, 4);
-	gtable_unpack(p + 0xB, &status->ramparerrl,20,  0, 4);
-	gtable_unpack(p + 0xC, &status->ramparerru, 4,  0, 4);
+	if (IS_ET(device_id)) {
+		gtable_unpack(p + 0xA, &status->port_0ah,  15,  8, 4);
+		gtable_unpack(p + 0xA, &status->fwds_0ah,   1,  1, 4);
+		gtable_unpack(p + 0xA, &status->parts,      0,  0, 4);
+		gtable_unpack(p + 0xB, &status->ramparerrl,20,  0, 4);
+		gtable_unpack(p + 0xC, &status->ramparerru, 4,  0, 4);
+	} else {
+		gtable_unpack(p + 0xA, &status->buflwmark, 30,  0, 4);
+		gtable_unpack(p + 0xB, &status->port_0ah,  15,  8, 4);
+		gtable_unpack(p + 0xB, &status->fwds_0ah,   1,  1, 4);
+		gtable_unpack(p + 0xB, &status->parts,      0,  0, 4);
+		gtable_unpack(p + 0xC, &status->ramparerrl,22,  0, 4);
+		gtable_unpack(p + 0xD, &status->ramparerru, 4,  0, 4);
+	}
 }
 
-void sja1105_general_status_show(struct sja1105_general_status *status)
+void sja1105_general_status_show(struct sja1105_general_status *status,
+                                 uint64_t device_id)
 {
-	printf("DEVICE_ID  %" PRIX64 "\n", status->device_id);
 	printf("CONFIGS    %" PRIX64 "\n", status->configs);
 	printf("CRCCHKL    %" PRIX64 "\n", status->crcchkl);
 	printf("IDS        %" PRIX64 "\n", status->ids);
@@ -119,6 +135,9 @@ void sja1105_general_status_show(struct sja1105_general_status *status)
 	printf("VLNOTFOUND %" PRIX64 "\n", status->vlnotfound);
 	printf("EMPTYS     %" PRIX64 "\n", status->emptys);
 	printf("BUFFERS    %" PRIX64 "\n", status->buffers);
+	if (IS_PQRS(device_id)) {
+		printf("BUFLWMARK  %" PRIX64 "\n", status->buflwmark);
+	}
 	printf("PORT_0Ah   %" PRIX64 "\n", status->port_0ah);
 	printf("FWDS_0Ah   %" PRIX64 "\n", status->fwds_0ah);
 	printf("PARTS      %" PRIX64 "\n", status->parts);
@@ -129,20 +148,25 @@ void sja1105_general_status_show(struct sja1105_general_status *status)
 int sja1105_general_status_get(struct sja1105_spi_setup *spi_setup,
                                struct sja1105_general_status *status)
 {
-	const int SIZE_GENERAL_STATUS = 0x0D * 4; /* 0x00 to 0x0C */
+	const int SIZE_GENERAL_STATUS = IS_ET(spi_setup->device_id) ?
+	                                0x0C * 4 : /* 0x01 to 0x0C */
+	                                0x0D * 4;  /* 0x01 to 0x0D */
 	uint8_t packed_buf[SIZE_GENERAL_STATUS];
 	int rc;
 
+	/* The base address is off-by-1 compared to UM10944,
+	 * because we are skipping device_id from the readout. */
 	rc = sja1105_spi_send_packed_buf(spi_setup,
 	                                 SPI_READ,
-	                                 CORE_ADDR + 0x00,
+	                                 CORE_ADDR + 0x01,
 	                                 packed_buf,
 	                                 SIZE_GENERAL_STATUS);
 	if (rc < 0) {
 		loge("spi read failed");
 		goto out;
 	}
-	sja1105_general_status_unpack(packed_buf, status);
+	sja1105_general_status_unpack(packed_buf, status,
+	                              spi_setup->device_id);
 out:
 	return rc;
 }

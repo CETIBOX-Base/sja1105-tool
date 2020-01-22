@@ -40,7 +40,7 @@
 #include <common.h>
 
 int sja1105_clocking_setup(struct sja1105_spi_setup *spi_setup,
-                           struct sja1105_xmii_params_table *params,
+                           struct sja1105_xmii_params_entry *params,
                            struct sja1105_mac_config_entry  *mac_config)
 {
 	int speed_mbps = 0;
@@ -66,11 +66,18 @@ int sja1105_clocking_setup(struct sja1105_spi_setup *spi_setup,
 			} else {
 				rgmii_clocking_setup(spi_setup, i, speed_mbps);
 			}
-
+		} else if (params->xmii_mode[i] == XMII_SPEED_SGMII &&
+		           IS_PQRS(spi_setup->device_id)) {
+			if ((i == 4) && (IS_R(spi_setup->device_id, spi_setup->part_nr) ||
+			                 IS_S(spi_setup->device_id, spi_setup->part_nr))) {
+				sgmii_clocking_setup(spi_setup, i, speed_mbps);
+			} else {
+				logv("Port %d is tri-stated", i);
+			}
 		} else {
 			loge("Invalid xmii_mode for port %d specified: %" PRIu64,
 			     i, params->xmii_mode[i]);
-			rc = -1;
+			rc = -EINVAL;
 			goto out;
 		}
 	}

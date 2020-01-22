@@ -1,5 +1,5 @@
 /******************************************************************************
- * Copyright (c) 2017, NXP Semiconductors
+ * Copyright (c) 2018, NXP Semiconductors
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -28,35 +28,22 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  *****************************************************************************/
-#ifndef _DYN_CFG_TABLES_H
-#define _DYN_CFG_TABLES_H
+#ifndef _SJA1105_TOOL_ERRORS_H
+#define _SJA1105_TOOL_ERRORS_H
 
-#define SJA1105_MGMT_ROUTE_COUNT 4
+/* Error codes returned to external userspace applications.
+ */
+#define SJA1105_ERR_OK                                                0
+#define SJA1105_ERR_USAGE                                             1
+#define SJA1105_ERR_CMDLINE_PARSE                                     2
+#define SJA1105_ERR_HW_NOT_RESPONDING                                 3
+#define SJA1105_ERR_HW_NOT_RESPONDING_STAGING_AREA_DIRTY              4
+#define SJA1105_ERR_UPLOAD_FAILED_HW_LEFT_FLOATING                    5
+#define SJA1105_ERR_UPLOAD_FAILED_HW_LEFT_FLOATING_STAGING_AREA_DIRTY 6
+#define SJA1105_ERR_STAGING_AREA_INVALID                              7
+#define SJA1105_ERR_INVALID_XML                                       8
+#define SJA1105_ERR_FILESYSTEM                                        9
 
-#include "static-config-tables.h"
-
-struct sja1105_mgmt_entry {
-	uint64_t ts_regid;
-	uint64_t egr_ts;
-	uint64_t macaddr;
-	uint64_t destports;
-	uint64_t enfport;
-	uint64_t index;
-};
-
-union sja1105_dyn_l2_lookup_entry {
-	struct sja1105_l2_lookup_entry l2;
-	struct sja1105_mgmt_entry mgmt;
-};
-
-struct sja1105_dyn_l2_lookup_cmd {
-	uint64_t valid;
-	uint64_t rdwrset;
-	uint64_t errors;
-	uint64_t lockeds;
-	uint64_t valident;
-	uint64_t mgmtroute;
-	union sja1105_dyn_l2_lookup_entry entry;
-};
+const char *sja1105_err_code_to_string(int rc);
 
 #endif

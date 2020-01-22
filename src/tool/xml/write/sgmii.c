@@ -28,17 +28,34 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  *****************************************************************************/
-#ifndef _RGU_TABLES_H
-#define _RGU_TABLES_H
+#include "internal.h"
 
-/* RGU */
-#define RGU_ADDR    0x100440
-#define RGU_MSG_LEN 8
-#define RGU_WARM    0x04
-#define RGU_COLD    0x08
+int
+sgmii_table_write(xmlTextWriterPtr writer,
+                  struct sja1105_static_config *config)
+{
+	int rc = 0;
+	int i;
 
-struct sja1105_reset_ctrl {
-	uint64_t rst_ctrl;
-};
+	logv("writing %d SGMII Table entries", config->sgmii_count);
+	for (i = 0; i < config->sgmii_count; i++) {
+		rc |= xmlTextWriterStartElement(writer, BAD_CAST "entry");
+		rc |= xml_write_field(writer, "index",       i);
+		rc |= xml_write_field(writer, "digital_error_cnt", config->sgmii[i].digital_error_cnt);
+		rc |= xml_write_field(writer, "digital_control_2", config->sgmii[i].digital_control_2);
+		rc |= xml_write_field(writer, "debug_control", config->sgmii[i].debug_control);
+		rc |= xml_write_field(writer, "test_control", config->sgmii[i].test_control);
+		rc |= xml_write_field(writer, "autoneg_control", config->sgmii[i].autoneg_control);
+		rc |= xml_write_field(writer, "digital_control_1", config->sgmii[i].digital_control_1);
+		rc |= xml_write_field(writer, "autoneg_adv", config->sgmii[i].autoneg_adv);
+		rc |= xml_write_field(writer, "basic_control", config->sgmii[i].basic_control);
+		rc |= xmlTextWriterEndElement(writer);
+		if (rc < 0) {
+			loge("error while writing SGMII Table element %d", i);
+			return -EINVAL;
+		}
+	}
+	return 0;
+}
 
-#endif
+

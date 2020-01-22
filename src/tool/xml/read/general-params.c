@@ -30,7 +30,7 @@
  *****************************************************************************/
 #include "internal.h"
 
-static int entry_get(xmlNode *node, struct sja1105_general_params_table *entry)
+static int entry_get(xmlNode *node, struct sja1105_general_params_entry *entry)
 {
 	int rc = 0;
 	rc |= xml_read_field(&entry->vllupformat, "vllupformat", node);
@@ -53,21 +53,27 @@ static int entry_get(xmlNode *node, struct sja1105_general_params_table *entry)
 	rc |= xml_read_field(&entry->tpid,        "tpid", node);
 	rc |= xml_read_field(&entry->ignore2stf,  "ignore2stf", node);
 	rc |= xml_read_field(&entry->tpid2,       "tpid2", node);
-	if (rc) {
+	rc |= xml_read_field(&entry->queue_ts,    "queue_ts", node);
+	rc |= xml_read_field(&entry->egrmirrvid,  "egrmirrvid", node);
+	rc |= xml_read_field(&entry->egrmirrpcp,  "egrmirrpcp", node);
+	rc |= xml_read_field(&entry->egrmirrdei,  "egrmirrdei", node);
+	rc |= xml_read_field(&entry->replay_port, "replay_port", node);
+	if (rc < 0) {
 		loge("General Parameters entry is incomplete!");
+		return -EINVAL;
 	}
-	return rc;
+	return 0;
 }
 
 static int parse_entry(xmlNode *node, struct sja1105_static_config *config)
 {
-	struct sja1105_general_params_table entry;
+	struct sja1105_general_params_entry entry;
 	int rc;
 
 	if (config->general_params_count >= MAX_GENERAL_PARAMS_COUNT) {
 		loge("Cannot have more than %d General Parameters Table entries!",
 		     MAX_GENERAL_PARAMS_COUNT);
-		rc = -1;
+		rc = -ERANGE;
 		goto out;
 	}
 	memset(&entry, 0, sizeof(entry));
@@ -84,7 +90,7 @@ int general_parameters_table_parse(xmlNode *node, struct sja1105_static_config *
 
 	if (node->type != XML_ELEMENT_NODE) {
 		loge("General Parameters Table node must be of element type!");
-		rc = -1;
+		rc = -EINVAL;
 		goto out;
 	}
 	for (c = node->children; c != NULL; c = c->next) {

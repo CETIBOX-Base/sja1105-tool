@@ -39,12 +39,12 @@
 #include <lib/helpers.h>
 #include <common.h>
 
-void sja1105_l2_lookup_entry_access(void *buf,
-                                    struct sja1105_l2_lookup_entry *entry,
-                                    int write)
+void sja1105et_l2_lookup_entry_access(void *buf,
+                                      struct sja1105_l2_lookup_entry *entry,
+                                      int write)
 {
 	int  (*pack_or_unpack)(void*, uint64_t*, int, int, int);
-	int    size = SIZE_L2_LOOKUP_ENTRY;
+	int    size = SIZE_L2_LOOKUP_ENTRY_ET;
 
 	if (write == 0) {
 		pack_or_unpack = gtable_unpack;
@@ -60,18 +60,49 @@ void sja1105_l2_lookup_entry_access(void *buf,
 	pack_or_unpack(buf, &entry->index,     29, 20, size);
 }
 
-void sja1105_l2_lookup_entry_pack(void *buf, struct
-                                  sja1105_l2_lookup_entry *entry)
+void sja1105pqrs_l2_lookup_entry_access(void *buf,
+                                        struct sja1105_l2_lookup_entry *entry,
+                                        int write)
 {
-	sja1105_l2_lookup_entry_access(buf, entry, 1);
+	int  (*pack_or_unpack)(void*, uint64_t*, int, int, int);
+	int    size = SIZE_L2_LOOKUP_ENTRY_PQRS;
+
+	if (write == 0) {
+		pack_or_unpack = gtable_unpack;
+		memset(entry, 0, sizeof(*entry));
+	} else {
+		pack_or_unpack = gtable_pack;
+		memset(buf, 0, size);
+	}
+	/* These are static L2 lookup entries, so the structure
+	 * should match UM11040 Table 16/17 definitions when
+	 * LOCKEDS is 1.
+	 */
+	pack_or_unpack(buf, &entry->tsreg,        159, 159, size);
+	pack_or_unpack(buf, &entry->mirrvlan,     158, 147, size);
+	pack_or_unpack(buf, &entry->takets,       146, 146, size);
+	pack_or_unpack(buf, &entry->mirr,         145, 145, size);
+	pack_or_unpack(buf, &entry->retag,        144, 144, size);
+	pack_or_unpack(buf, &entry->mask_iotag,   143, 143, size);
+	pack_or_unpack(buf, &entry->mask_vlanid,  142, 131, size);
+	pack_or_unpack(buf, &entry->mask_macaddr, 130,  83, size);
+	pack_or_unpack(buf, &entry->iotag,         82,  82, size);
+	pack_or_unpack(buf, &entry->vlanid,        81,  70, size);
+	pack_or_unpack(buf, &entry->macaddr,       69,  22, size);
+	pack_or_unpack(buf, &entry->destports,     21,  17, size);
+	pack_or_unpack(buf, &entry->enfport,       16,  16, size);
+	pack_or_unpack(buf, &entry->index,         15,   6, size);
 }
 
-void sja1105_l2_lookup_entry_unpack(void *buf, struct
-                                    sja1105_l2_lookup_entry *entry)
-{
-	sja1105_l2_lookup_entry_access(buf, entry, 0);
-}
+/*
+ * sja1105et_l2_lookup_entry_pack
+ * sja1105et_l2_lookup_entry_unpack
+ * sja1105pqrs_l2_lookup_entry_pack
+ * sja1105pqrs_l2_lookup_entry_unpack
+ */
+DEFINE_SEPARATE_PACK_UNPACK_ACCESSORS(l2_lookup);
 
+/* Common functions */
 void sja1105_l2_lookup_entry_fmt_show(
 		char *print_buf,
 		char *fmt,

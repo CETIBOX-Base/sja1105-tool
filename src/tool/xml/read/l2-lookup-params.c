@@ -30,7 +30,7 @@
  *****************************************************************************/
 #include "internal.h"
 
-static int entry_get(xmlNode *node, struct sja1105_l2_lookup_params_table *entry)
+static int entry_get(xmlNode *node, struct sja1105_l2_lookup_params_entry *entry)
 {
 	int rc = 0;
 	rc |= xml_read_field(&entry->maxage, "maxage", node);
@@ -39,21 +39,22 @@ static int entry_get(xmlNode *node, struct sja1105_l2_lookup_params_table *entry
 	rc |= xml_read_field(&entry->shared_learn, "shared_learn", node);
 	rc |= xml_read_field(&entry->no_enf_hostprt, "no_enf_hostprt", node);
 	rc |= xml_read_field(&entry->no_mgmt_learn, "no_mgmt_learn", node);
-	if (rc) {
+	if (rc < 0) {
 		loge("L2 Lookup Parameters entry is incomplete!");
+		return -EINVAL;
 	}
-	return rc;
+	return 0;
 }
 
 static int parse_entry(xmlNode *node, struct sja1105_static_config *config)
 {
-	struct sja1105_l2_lookup_params_table entry;
+	struct sja1105_l2_lookup_params_entry entry;
 	int rc;
 
 	if (config->l2_lookup_params_count >= MAX_L2_LOOKUP_PARAMS_COUNT) {
 		loge("Cannot have more than %d L2 Lookup "
 		     "Parameters Table entries!", MAX_L2_LOOKUP_PARAMS_COUNT);
-		rc = -1;
+		rc = -ERANGE;
 		goto out;
 	}
 	memset(&entry, 0, sizeof(entry));
@@ -71,7 +72,7 @@ int l2_address_lookup_parameters_table_parse(xmlNode *node, struct sja1105_stati
 	if (node->type != XML_ELEMENT_NODE) {
 		loge("L2 Lookup Parameters Table node must be "
 		     "of element type!");
-		rc = -1;
+		rc = -EINVAL;
 	}
 	for (c = node->children; c != NULL; c = c->next) {
 		if (c->type != XML_ELEMENT_NODE) {

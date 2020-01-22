@@ -37,10 +37,11 @@ static int entry_get(xmlNode *node, struct sja1105_vl_forwarding_entry *entry)
 	rc |= xml_read_field(&entry->priority, "priority", node);
 	rc |= xml_read_field(&entry->partition, "partition", node);
 	rc |= xml_read_field(&entry->destports, "destports", node);
-	if (rc) {
+	if (rc < 0) {
 		loge("VL Forwarding Table incomplete!");
+		return -EINVAL;
 	}
-	return rc;
+	return 0;
 }
 
 static int parse_entry(xmlNode *node, struct sja1105_static_config *config)
@@ -51,7 +52,7 @@ static int parse_entry(xmlNode *node, struct sja1105_static_config *config)
 	if (config->vl_forwarding_count >= MAX_VL_FORWARDING_COUNT) {
 		loge("Cannot have more than %d VL Forwarding entries!",
 		     MAX_VL_FORWARDING_COUNT);
-		rc = -1;
+		rc = -ERANGE;
 		goto out;
 	}
 	memset(&entry, 0, sizeof(entry));
@@ -68,7 +69,7 @@ int vl_forwarding_table_parse(xmlNode *node, struct sja1105_static_config *confi
 
 	if (node->type != XML_ELEMENT_NODE) {
 		loge("VL Forwarding table node must be of element type!");
-		rc = -1;
+		rc = -EINVAL;
 		goto out;
 	}
 	for (c = node->children; c != NULL; c = c->next) {

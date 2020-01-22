@@ -33,6 +33,22 @@
 
 #include <stdint.h>
 #include <stdio.h>
+#include <errno.h>
+
+/* These are our own error codes */
+#include <lib/include/errors.h>
+
+/* Since remapping is used internally, and many checks
+ * search for a negative return code, we do that here.
+ * The sign is flipped again when returning the error
+ * to userspace.
+ */
+#define sja1105_err_remap(old_err, new_err)           \
+	do {                                          \
+		logv("Remapping error code %d to %d", \
+		    (old_err), (new_err));            \
+		old_err = -new_err;                   \
+	} while (0);
 
 #define MAX_LINE_SIZE 2048
 
@@ -40,19 +56,20 @@
 extern int SJA1105_DEBUG_CONDITION;
 extern int SJA1105_VERBOSE_CONDITION;
 
-#define _log(file, fmt, ...) do { \
-	if (SJA1105_DEBUG_CONDITION) { \
-		fprintf(file, "%s@%d: " fmt "\n", \
-		__func__, __LINE__, ##__VA_ARGS__); \
-	} else { \
+#define _log(file, fmt, ...) do {                       \
+	if (SJA1105_DEBUG_CONDITION) {                  \
+		fprintf(file, "%s@%d: %s: " fmt "\n",   \
+		        __FILE__, __LINE__, __func__,   \
+		        ##__VA_ARGS__);                 \
+	} else {                                        \
 		fprintf(file, fmt "\n", ##__VA_ARGS__); \
-	} \
+	}                                               \
 } while(0);
 
-#define logc(file, condition, ...) do { \
-	if (condition) { \
-		_log(file, __VA_ARGS__); \
-	} \
+#define logc(file, condition, ...) do {                 \
+	if (condition) {                                \
+		_log(file, __VA_ARGS__);                \
+	}                                               \
 } while(0);
 
 #define loge(...) _log(stderr, __VA_ARGS__)
@@ -61,5 +78,30 @@ extern int SJA1105_VERBOSE_CONDITION;
 
 void formatted_append(char *buffer, char *width_fmt, char *fmt, ...);
 void print_array(char *print_buf, uint64_t *array, int count);
+
+#define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
+#define min(x, y) (((x) < (y)) ? (x) : (y))
+
+
+#define DEFINE_PACK_UNPACK_ACCESSORS(device, table)                                \
+                                                                                   \
+	void sja1105##device##_##table##_entry_pack(void *buf,                     \
+	                           struct sja1105_##table##_entry *entry)          \
+	{                                                                          \
+		sja1105##device##_##table##_entry_access(buf, entry, 1);           \
+	}                                                                          \
+                                                                                   \
+	void sja1105##device##_##table##_entry_unpack(void *buf,                   \
+	                           struct sja1105_##table##_entry *entry)          \
+	{                                                                          \
+		sja1105##device##_##table##_entry_access(buf, entry, 0);           \
+	}
+
+#define DEFINE_COMMON_PACK_UNPACK_ACCESSORS(table)                                 \
+	DEFINE_PACK_UNPACK_ACCESSORS(, table);                                     \
+
+#define DEFINE_SEPARATE_PACK_UNPACK_ACCESSORS(table)                               \
+	DEFINE_PACK_UNPACK_ACCESSORS(et, table);                                   \
+	DEFINE_PACK_UNPACK_ACCESSORS(pqrs, table);                                 \
 
 #endif

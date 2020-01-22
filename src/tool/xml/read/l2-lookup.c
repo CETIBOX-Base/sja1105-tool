@@ -33,15 +33,25 @@
 static int entry_get(xmlNode *node, struct sja1105_l2_lookup_entry *entry)
 {
 	int rc = 0;
+	rc |= xml_read_field(&entry->tsreg, "tsreg", node);
+	rc |= xml_read_field(&entry->mirrvlan, "mirrvlan", node);
+	rc |= xml_read_field(&entry->takets, "takets", node);
+	rc |= xml_read_field(&entry->mirr, "mirr", node);
+	rc |= xml_read_field(&entry->retag, "retag", node);
+	rc |= xml_read_field(&entry->mask_iotag, "mask_iotag", node);
+	rc |= xml_read_field(&entry->mask_vlanid, "mask_vlanid", node);
+	rc |= xml_read_field(&entry->mask_macaddr, "mask_macaddr", node);
+	rc |= xml_read_field(&entry->iotag, "iotag", node);
 	rc |= xml_read_field(&entry->vlanid, "vlanid", node);
 	rc |= xml_read_field(&entry->macaddr, "macaddr", node);
 	rc |= xml_read_field(&entry->destports, "destports", node);
 	rc |= xml_read_field(&entry->enfport, "enfport", node);
 	rc |= xml_read_field(&entry->index, "index", node);
-	if (rc) {
+	if (rc < 0) {
 		loge("L2 Lookup entry is incomplete!");
+		return -EINVAL;
 	}
-	return rc;
+	return 0;
 }
 
 static int parse_entry(xmlNode *node, struct sja1105_static_config *config)
@@ -52,7 +62,7 @@ static int parse_entry(xmlNode *node, struct sja1105_static_config *config)
 	if (config->l2_lookup_count >= MAX_L2_LOOKUP_COUNT) {
 		loge("Cannot have more than %d L2 Lookup "
 		     "Table entries!", MAX_L2_LOOKUP_COUNT);
-		rc = -1;
+		rc = -ERANGE;
 		goto out;
 	}
 	memset(&entry, 0, sizeof(entry));
@@ -69,7 +79,7 @@ int l2_address_lookup_table_parse(xmlNode *node, struct sja1105_static_config *c
 
 	if (node->type != XML_ELEMENT_NODE) {
 		loge("L2 Lookup Table node must be of element type!");
-		rc = -1;
+		rc = -EINVAL;
 		goto out;
 	}
 	for (c = node->children; c != NULL; c = c->next) {
