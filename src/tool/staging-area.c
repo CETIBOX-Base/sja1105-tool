@@ -359,6 +359,7 @@ int static_config_flush(struct sja1105_spi_setup *spi_setup,
 			loge("configuration is invalid");
 		}
 	}
+	spi_sja1105_set_switchid(spi_setup, config->general_params[0].switchid);
 out:
 	if (spi_setup->dry_run == 0) {
 		/* Always reenable polling on exit */

@@ -81,6 +81,7 @@ int sja1105_spi_send_int(struct sja1105_spi_setup *spi_setup,
 struct sja1105_static_config;
 void spi_sja1105_set_polling(const struct sja1105_spi_setup *spi_setup, int enable,
 							 struct sja1105_static_config *config);
+void spi_sja1105_set_switchid(const struct sja1105_spi_setup *spi_setup, uint8_t switch_id);
 
 #define SIZE_SJA1105_DEVICE_ID 4
 #define SIZE_SPI_MSG_HEADER    4
