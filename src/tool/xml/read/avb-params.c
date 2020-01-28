@@ -30,11 +30,13 @@
  *****************************************************************************/
 #include "internal.h"
 
-static int entry_get(xmlNode *node, struct sja1105_avb_params_entry *entry)
+static int entry_get(xmlNode *node, struct sja1105_avb_params_entry *entry, uint64_t device_id)
 {
 	int rc = 0;
-	rc |= xml_read_field(&entry->l2cbs,      "l2cbs", node);
-	rc |= xml_read_field(&entry->cas_master, "cas_master", node);
+	if (IS_PQRS(device_id)) {
+		rc |= xml_read_field(&entry->l2cbs,      "l2cbs", node);
+		rc |= xml_read_field(&entry->cas_master, "cas_master", node);
+	}
 	rc |= xml_read_field(&entry->destmeta,   "destmeta", node);
 	rc |= xml_read_field(&entry->srcmeta,    "srcmeta", node);
 	if (rc < 0) {
@@ -56,7 +58,7 @@ static int parse_entry(xmlNode *node, struct sja1105_static_config *config)
 		goto out;
 	}
 	memset(&entry, 0, sizeof(entry));
-	rc = entry_get(node, &entry);
+	rc = entry_get(node, &entry, config->device_id);
 	config->avb_params[config->avb_params_count++] = entry;
 out:
 	return rc;
