@@ -359,10 +359,7 @@ int static_config_flush(struct sja1105_spi_setup *spi_setup,
 		}
 	}
 
-	if (spi_setup->dry_run == 0) {
-		/* Always reenable polling on exit */
-		spi_sja1105_set_polling(spi_setup, 1, config);
-	}
+	spi_sja1105_set_switchid(spi_setup, config->general_params[0].switchid);
 
 	rc = SJA1105_ERR_OK;
 	goto out;

@@ -330,6 +330,7 @@ struct sja1105_poll_config {
 };
 
 #define SJA1105_IOC_POLL _IOW(SPI_IOC_MAGIC, 255, struct sja1105_poll_config)
+#define SJA1105_IOC_SWITCHID _IOW(SPI_IOC_MAGIC, 254, uint8_t)
 
 void spi_sja1105_set_polling(const struct sja1105_spi_setup *spi_setup, int enable,
 							 struct sja1105_static_config *config)
@@ -361,4 +362,9 @@ void spi_sja1105_set_polling(const struct sja1105_spi_setup *spi_setup, int enab
 	poll_config.poll_enable = enable;
 
 	ioctl(spi_setup->fd, SJA1105_IOC_POLL, &poll_config);
+}
+
+void spi_sja1105_set_switchid(const struct sja1105_spi_setup *spi_setup, uint8_t switch_id)
+{
+	ioctl(spi_setup->fd, SJA1105_IOC_SWITCHID, &switch_id);
 }
