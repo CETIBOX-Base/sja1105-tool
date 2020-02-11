@@ -347,6 +347,7 @@ void spi_sja1105_set_polling(const struct sja1105_spi_setup *spi_setup, int enab
 
 		for (i = 0;i < 5;++i) {
 			poll_config.mac_config[i] =
+				((config->mac_config[i].speed&0x3)<<29) |
 				((config->mac_config[i].drpdtag==0)?0:(1<<23)) |
 				((config->mac_config[i].drpuntag==0)?0:(1<<22)) |
 				((config->mac_config[i].retag==0)?0:(1<<21)) |
