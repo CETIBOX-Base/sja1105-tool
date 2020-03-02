@@ -1,5 +1,6 @@
 /******************************************************************************
  * Copyright (c) 2016, NXP Semiconductors
+ * Copyright (c) 2020, CETiTEC GmbH
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,10 +32,29 @@
 #include "internal.h"
 
 int
-retagging_table_write(__attribute__((unused)) xmlTextWriterPtr writer,
-                      __attribute__((unused)) struct sja1105_static_config *config)
+retagging_table_write(xmlTextWriterPtr writer,
+                      struct sja1105_static_config *config)
 {
-	logv("Retagging Table not implemented!");
+	int rc = 0;
+	int i;
+
+	logv("writing %d Retagging entries", config->retagging_count);
+	for (i = 0; i < config->retagging_count; i++) {
+		rc |= xmlTextWriterStartElement(writer, BAD_CAST "entry");
+		rc |= xml_write_field(writer, "index", i);
+		rc |= xml_write_field(writer, "egr_port", config->retagging[i].egr_port);
+		rc |= xml_write_field(writer, "ing_port", config->retagging[i].ing_port);
+		rc |= xml_write_field(writer, "vlan_ing", config->retagging[i].vlan_ing);
+		rc |= xml_write_field(writer, "vlan_egr", config->retagging[i].vlan_egr);
+		rc |= xml_write_field(writer, "do_not_learn", config->retagging[i].do_not_learn);
+		rc |= xml_write_field(writer, "use_dest_ports", config->retagging[i].use_dest_ports);
+		rc |= xml_write_field(writer, "destports", config->retagging[i].destports);
+		rc |= xmlTextWriterEndElement(writer);
+		if (rc < 0) {
+			loge("error while writing retagging Table element %d", i);
+			return -EINVAL;
+		}
+	}
 	return 0;
 }
 

@@ -107,14 +107,7 @@ DECLARE_TABLE_SHOW_FN(vl_policing, MAX_VL_POLICING_COUNT, "Virtual Link Policing
 DECLARE_TABLE_SHOW_FN(vl_forwarding, MAX_VL_FORWARDING_COUNT, "Virtual Link Forwarding Table", "%-35s\n")
 DECLARE_TABLE_SHOW_FN(avb_params, MAX_AVB_PARAMS_COUNT, "Audio/Video Bridging Parameters Table", "%-35s\n")
 DECLARE_TABLE_SHOW_FN(vl_forwarding_params, MAX_VL_FORWARDING_PARAMS_COUNT, "Virtual Link Forwarding Parameters Table", "%-50s\n")
-
-static int
-retagging_table_show(__attribute__((unused)) struct sja1105_static_config *config,
-                     __attribute__((unused)) int index)
-{
-	logv("Retagging Table unimplemented");
-	return 0;
-}
+DECLARE_TABLE_SHOW_FN(retagging, MAX_RETAGGING_COUNT, "Retagging Table", "%-35s\n")
 
 static int
 clock_sync_params_table_show(__attribute__((unused)) struct sja1105_static_config *config,

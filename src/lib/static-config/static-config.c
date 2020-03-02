@@ -207,7 +207,7 @@ int sja1105_static_config_add_entry(struct sja1105_table_header *hdr, void *buf,
 	}
 	case BLKID_RETAGGING_TABLE:
 	{
-		logv("Retagging Table Unimplemented\n");
+		POPULATE_CONFIG_TABLE(, retagging, buf, MAX_RETAGGING_COUNT, "Retagging");
 		return SIZE_RETAGGING_ENTRY;
 	}
 	case BLKID_XMII_MODE_PARAMS_TABLE:
@@ -624,6 +624,11 @@ sja1105_static_config_pack(void *buf, struct sja1105_static_config *config)
 		                     sja1105pqrs_general_params_entry_pack,
 		                     config->general_params);
 	}
+	PACK_TABLE_IN_BUF_FN(config->retagging_count,
+						 SIZE_RETAGGING_ENTRY,
+						 BLKID_RETAGGING_TABLE,
+						 sja1105_retagging_entry_pack,
+						 config->retagging);
 	PACK_TABLE_IN_BUF_FN(config->xmii_params_count,
 	                     SIZE_XMII_MODE_PARAMS_ENTRY,
 	                     BLKID_XMII_MODE_PARAMS_TABLE,
@@ -666,6 +671,7 @@ sja1105_static_config_get_length(struct sja1105_static_config *config)
 	header_count += (config->l2_forwarding_params_count != 0);
 	header_count += (config->avb_params_count != 0);
 	header_count += (config->general_params_count != 0);
+	header_count += (config->retagging_count != 0);
 	header_count += (config->xmii_params_count != 0);
 	header_count += (config->sgmii_count != 0);
 	header_count += 1; /* Ending header */
@@ -688,6 +694,7 @@ sja1105_static_config_get_length(struct sja1105_static_config *config)
 	sum += config->l2_forwarding_params_count * SIZE_L2_FORWARDING_PARAMS_ENTRY;
 	sum += config->avb_params_count * (IS_PQRS(config->device_id) ? SIZE_AVB_PARAMS_ENTRY_PQRS : SIZE_AVB_PARAMS_ENTRY_ET);
 	sum += config->general_params_count * (IS_PQRS(config->device_id) ? SIZE_GENERAL_PARAMS_ENTRY_PQRS : SIZE_GENERAL_PARAMS_ENTRY_ET);
+	sum += config->retagging_count * SIZE_RETAGGING_ENTRY;
 	sum += config->xmii_params_count * SIZE_XMII_MODE_PARAMS_ENTRY;
 	sum += config->sgmii_count * SIZE_SGMII_ENTRY;
 	sum -= 4; /* Last header does not have an extra CRC because there is no data */

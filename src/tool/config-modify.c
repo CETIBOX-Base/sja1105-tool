@@ -917,13 +917,50 @@ out:
 }
 
 static int retagging_table_entry_modify(
-		__attribute__((unused)) struct sja1105_static_config *config,
-		__attribute__((unused)) int entry,
-		__attribute__((unused)) char *field_name,
-		__attribute__((unused)) char *field_val)
+		struct sja1105_static_config *config,
+		int entry_index,
+		char *field_name,
+		char *field_val)
 {
-	loge("unimplemented");
-	return -1;
+	const char *options[] = {
+		"egr_port",
+		"ing_port",
+		"vlan_ing",
+		"vlan_egr",
+		"do_not_learn",
+		"use_dest_ports",
+		"destports",
+	};
+	uint64_t *fields[] = {
+		&config->retagging[entry_index].egr_port,
+		&config->retagging[entry_index].ing_port,
+		&config->retagging[entry_index].vlan_ing,
+		&config->retagging[entry_index].vlan_egr,
+		&config->retagging[entry_index].do_not_learn,
+		&config->retagging[entry_index].use_dest_ports,
+		&config->retagging[entry_index].destports,
+	};
+	int entry_field_counts[] = {1, 1, 1, 1, 1, 1, 1};
+	uint64_t tmp;
+	int rc;
+
+	if (matches(field_name, "entry-count") == 0) {
+		rc = reliable_uint64_from_string(&tmp, field_val, NULL);
+		config->retagging_count = tmp;
+		goto out;
+	}
+	rc = get_match(field_name, options, ARRAY_SIZE(options));
+	if (rc < 0) {
+		goto out;
+	}
+	rc = generic_table_entry_modify(
+			fields[rc],
+			entry_index,
+			config->retagging_count,
+			entry_field_counts[rc],
+			field_val);
+out:
+	return rc;
 }
 
 static int avb_params_table_entry_modify(
